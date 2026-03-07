@@ -7,7 +7,7 @@ from connector import DataConnector  # Import your base class
 
 class StockPipeline(DataConnector):
     """
-    Final Exam Pipeline: Fetches, cleans, and loads stock data.
+    Fetches, cleans, and loads stock data.
     """
     def __init__(self, source_name: str, db_config: Dict):
         super().__init__(source_name)
@@ -34,7 +34,7 @@ class StockPipeline(DataConnector):
         return raw_data
 
     def transform(self, raw_data: List[Dict]) -> List[Dict]:
-        """Applies the cleaning logic we discussed."""
+        """Applies the cleaning logic."""
         clean_results = []
         for record in raw_data:
             try:
