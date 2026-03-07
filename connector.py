@@ -1,6 +1,7 @@
 from typing import List, Dict, Optional
 import random
 import logging
+import math
 import psycopg2 # The Postgres driver
 
 
@@ -42,31 +43,46 @@ class UserDataProcessor(DataConnector):
     """
     def clean_data(self, raw_data: List[Dict]) -> List[Dict]:
         """
-        Tasks:
-        1. Convert all emails to lowercase.
-        2. Convert 'spent' from a string to a float.
-        3. If 'spent' is None, default it to 0.0.
+        Refined cleaning logic for financial data:
+        1. Rounds prices to 2 decimal places.
+        2. Filters out records with invalid (NaN or zero) prices.
+        3. Ensures volume is an integer.
         """
         clean_results = []
         
-        
         for record in raw_data:
-            cleaned_record = {}
-            # Clean email
-            cleaned_record['user_id'] = record['user_id']
-            cleaned_record['email'] = record['email'].lower() if record['email'] else None
-            
-            # Clean spent
-            if record['spent'] is None:
-                cleaned_record['spent'] = 0.0
-            else:
-                try:
-                    cleaned_record['spent'] = float(record['spent'])
-                except ValueError:
-                    logging.warning(f"Invalid 'spent' value for user_id {record['user_id']}. Defaulting to 0.0")
-                    cleaned_record['spent'] = 0.0
-            
-            clean_results.append(cleaned_record)
+            try:
+                # 1. Price Validation & Precision
+                close_price = record.get('close')
+                
+                # Check for NaN or None (Common in financial APIs)
+                if close_price is None or math.isnan(close_price) or close_price <= 0:
+                    logging.warning(f"Skipping invalid price for {record['ticker']} on {record['date']}: {close_price}")
+                    continue
+                    
+                # Round to 2 decimals for financial consistency
+                rounded_price = round(float(close_price), 2)
+
+                # 2. Volume Validation
+                volume = int(record.get('volume', 0))
+
+                # 3. Construct the cleaned record
+                cleaned_record = {
+                    "ticker": record['ticker'],
+                    "company_name": record['company_name'],
+                    "sector": record['sector'],
+                    "date": record['date'],
+                    "close": rounded_price,
+                    "volume": volume
+                }
+                
+                clean_results.append(cleaned_record)
+
+            except (ValueError, TypeError) as e:
+                logging.error(f"Data type error for {record.get('ticker')}: {e}")
+                continue
+
+        logging.info(f"Successfully cleaned {len(clean_results)} out of {len(raw_data)} records.")
         return clean_results
     
     def load_to_postgres(self, cleaned_data: List[Dict]):
