@@ -1,46 +1,48 @@
-import yfinance as yf
-import pandas as pd
-from typing import List, Dict
+import logging
+from pipelines import StockPipeline
 
-def fetch_market_data(tickers: List[str]) -> List[Dict]:
+# 1. Configuration (In production, these would be in environment variables)
+DB_CONFIG = {
+    "dbname": "postgres",
+    "user": "postgres",
+    "password": "password",
+    "host": "localhost",
+    "port": "5432"
+}
+
+TICKERS_TO_TRACK = ["AAPL", "MSFT", "GOOGL", "TSLA", "NVDA"]
+
+# 2. Setup Logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s'
+)
+
+def run_market_pipeline():
     """
-    Fetches the last 5 days of closing prices for a list of tickers.
-    Returns a list of dictionaries for your pipeline to process.
+    Orchestrates the Phase 1 Final Exam Pipeline.
     """
-    raw_results = []
+    logging.info("--- Starting Market Data Pipeline ---")
     
-    for ticker in tickers:
-        print(f"Fetching data for {ticker}...")
-        # Get ticker info
-        stock = yf.Ticker(ticker)
+    # Initialize the specific pipeline
+    pipeline = StockPipeline(source_name="YahooFinance", db_config=DB_CONFIG)
+    
+    try:
+        # Step 1: Extract
+        raw_data = pipeline.extract(TICKERS_TO_TRACK)
         
-        # Get historical market data (last 5 days)
-        hist = stock.history(period="5d")
+        # Step 2: Transform
+        clean_data = pipeline.transform(raw_data)
         
-        # Extract metadata for your dim_stocks table
-        # Note: In production, you'd handle the case where info is missing
-        info = stock.info
-        company_name = info.get('longName', 'Unknown')
-        sector = info.get('sector', 'Unknown')
+        # Step 3: Load
+        if clean_data:
+            pipeline.load(clean_data)
+            logging.info("--- Pipeline Completed Successfully ---")
+        else:
+            logging.warning("No clean data found to load.")
 
-        # Convert the pandas dataframe into a list of dictionaries for your Fact table
-        for date, row in hist.iterrows():
-            raw_results.append({
-                "ticker": ticker,
-                "company_name": company_name,
-                "sector": sector,
-                "date": date.strftime('%Y-%m-%d'),
-                "close": row['Close'],
-                "volume": int(row['Volume'])
-            })
-            
-    return raw_results
+    except Exception as e:
+        logging.error(f"Pipeline failed at the orchestration level: {e}")
 
-# --- TEST IT ---
 if __name__ == "__main__":
-    symbols = ["AAPL", "MSFT", "GOOGL"]
-    market_data = fetch_market_data(symbols)
-    
-    # Print the first item to see the structure
-    print("\nSample Data Point:")
-    print(market_data[0])
+    run_market_pipeline()
