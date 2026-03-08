@@ -1,0 +1,19 @@
+# AWS & Infrastructure
+aws/
+.aws/
+localstack_data/
+localstack/
+
+# Data (Crucial: Never push actual data files)
+data/
+*.parquet
+*.csv
+*.log
+
+# Mac System Files
+.DS_Store
+
+# Python
+__pycache__/
+.env
+.venv/

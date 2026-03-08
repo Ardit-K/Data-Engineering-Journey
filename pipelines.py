@@ -3,6 +3,13 @@ import logging
 import math
 import psycopg2
 from typing import List, Dict
+import pandas as pd
+import pyarrow as pa
+import pyarrow.parquet as pq
+from datetime import datetime
+import os
+import boto3
+import os
 from connector import DataConnector  # Import your base class
 
 class StockPipeline(DataConnector):
@@ -94,3 +101,67 @@ class StockPipeline(DataConnector):
             logging.info("Load complete!")
         except Exception as e:
             logging.error(f"Load failed: {e}")
+
+    def save_as_parquet(self, clean_data: List[Dict], filename: str):
+        """
+        Converts a list of dicts to a Pandas DataFrame and saves to Parquet.
+        """
+        # 1. Convert List of Dicts -> Pandas DataFrame
+        df = pd.DataFrame(clean_data)
+        
+        # 2. Ensure types are correct (Very important for Parquet!)
+        df['date'] = pd.to_datetime(df['date'])
+        df['close'] = df['close'].astype(float)
+        df['volume'] = df['volume'].astype(int)
+        
+        # 3. Save to Parquet format
+        # This creates a file that is highly compressed and optimized for speed
+        df.to_parquet(filename, engine='pyarrow', compression='snappy')
+        
+        print(f"Successfully saved {len(df)} rows to {filename}")
+
+    def load_to_lake(self, clean_data: List[Dict], zone: str = "silver"):
+        """
+        The 'Modern' Load: Writing to a local Parquet file (The Lake).
+        """
+        # 1. Construct the path
+        today = datetime.now().strftime("%Y_%m_%d")
+        base_path = f"data/{zone}"
+        os.makedirs(base_path, exist_ok=True)
+        full_path = f"{base_path}/stocks_{today}.parquet"
+        
+        # 2. Convert to DataFrame
+        df = pd.DataFrame(clean_data)
+        
+        # 3. Save as Parquet
+        df.to_parquet(full_path, engine='pyarrow', compression='snappy')
+        logging.info(f"Phase 2: Data successfully loaded to Lake at {full_path}")
+        return full_path  # Return the path for potential upload to S3
+
+    def upload_to_s3(self, local_path: str, bucket_name: str):
+        """
+        Uploads your Parquet file to the LocalStack S3 bucket.
+        """
+        # Create the client pointing to LocalStack
+        s3 = boto3.client(
+            's3',
+            endpoint_url="http://localhost:4566",
+            aws_access_key_id="test",
+            aws_secret_access_key="test",
+            region_name="us-east-1"
+        )
+
+        try:
+            # 1. Create bucket if it doesn't exist
+            # Note: In LocalStack, buckets are deleted when you stop the container
+            s3.create_bucket(Bucket=bucket_name)
+            
+            # 2. Extract filename from path (e.g., 'stocks_2026_03_08.parquet')
+            s3_file_name = os.path.basename(local_path)
+            
+            # 3. Upload
+            s3.upload_file(local_path, bucket_name, s3_file_name)
+            logging.info(f"Successfully uploaded {s3_file_name} to local S3.")
+            
+        except Exception as e:
+            logging.error(f"S3 Upload failed: {e}")

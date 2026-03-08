@@ -1,0 +1,30 @@
+version: '3.8'
+
+services:
+  # Service 1: Your Relational Database (Phase 1)
+  db:
+    image: postgres:latest
+    container_name: my-postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  # Service 2: Your Cloud Simulator (Phase 2)
+  localstack:
+    image: localstack/localstack:latest
+    container_name: my-localstack
+    ports:
+      - "4566:4566"            # The standard LocalStack gateway
+    environment:
+      - SERVICES=s3            # Tells LocalStack to only run S3
+      - DEBUG=1
+    volumes:
+      - "./localstack_data:/var/lib/localstack"
+
+volumes:
+  postgres_data:
