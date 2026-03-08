@@ -1,14 +1,8 @@
 from pyspark.sql import SparkSession
 import os
 
-# --- SPARK CONFIGURATION ---
-# Using 3.3.4 and 1.12.262 to fix the '60s' NumberFormatException
-SUBMIT_ARGS = (
-    "--conf spark.driver.extraJavaOptions='-Dfs.s3a.connection.timeout=60000 -Dfs.s3a.connection.establish.timeout=60000' "
-    "--conf spark.executor.extraJavaOptions='-Dfs.s3a.connection.timeout=60000 -Dfs.s3a.connection.establish.timeout=60000' "
-    "--packages org.apache.hadoop:hadoop-aws:3.3.4,com.amazonaws:aws-java-sdk-bundle:1.12.262 "
-    "pyspark-shell"
-)
+# 1. Simplify Submit Args - Let's stick to the most compatible versions
+SUBMIT_ARGS = "--packages org.apache.hadoop:hadoop-aws:3.3.4,com.amazonaws:aws-java-sdk-bundle:1.12.262 pyspark-shell"
 os.environ["PYSPARK_SUBMIT_ARGS"] = SUBMIT_ARGS
 
 def create_spark_session():
@@ -22,30 +16,35 @@ def create_spark_session():
         .config("spark.hadoop.fs.s3a.aws.credentials.provider", "org.apache.hadoop.fs.s3a.SimpleAWSCredentialsProvider")
         .config("spark.hadoop.fs.s3a.connection.ssl.enabled", "false")
         .getOrCreate())
+
+    # Reach into the Java Hadoop Configuration and scrub the "24h" and "60s" values
+    hadoop_conf = spark._jsc.hadoopConfiguration()
+    
+    # Scrubbing the "60s" culprits
+    hadoop_conf.set("fs.s3a.connection.timeout", "60000")
+    hadoop_conf.set("fs.s3a.connection.establish.timeout", "60000")
+    hadoop_conf.set("fs.s3a.threads.keepalivetime", "60")
+    
+    # Scrubbing the "24h" culprits (Multipart Upload settings)
+    hadoop_conf.set("fs.s3a.multipart.purge.age", "86400") # 24 hours in seconds
+    hadoop_conf.set("fs.s3a.listing.cache.expiration", "600") # 10 minutes in seconds
+    
     return spark
 
 def analyze_stock_data():
     spark = create_spark_session()
     
-    # Path to your S3 bucket
-    s3_path = "s3a://ardit-stock-data-lake/*.parquet"
+    # Use the full path without the wildcard first to test connectivity
+    s3_path = "s3a://ardit-stock-data-lake/"
     
     print("\n--- ⚡ Spark is Reading from S3 ⚡ ---")
     
     try:
-        # READ
-        df = spark.read.parquet(s3_path)
-        
-        # SHOW DATA
+        df = spark.read.option("mergeSchema", "false").parquet(s3_path)
         df.show(5)
-        print(f"Total rows processed: {df.count()}")
-        
-        # ANALYTICS
-        print("\n--- 📈 Average Price per Ticker ---")
-        df.groupBy("ticker").avg("close_price").show()
-        
+        print(f"Total rows: {df.count()}")
     except Exception as e:
-        print(f"❌ Spark failed to read from S3: {e}")
+        print(f"❌ Spark failed: {e}")
     finally:
         spark.stop()
 
