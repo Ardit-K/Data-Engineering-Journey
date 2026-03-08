@@ -37,3 +37,30 @@ Ensure Docker Desktop is running, then spin up the hybrid storage environment:
 ```bash
 docker-compose up -d
 ```
+
+### 2. Environment Configuration
+Install the necessary Python libraries and the AWS CLI local wrapper:
+```bash
+pip install pandas pyarrow boto3 awscli-local
+```
+
+### 3. Pipeline Execution
+Run the orchestrator to extract, transform, and load data into both Postgres and S3:
+``` bash
+python3 main.py
+```
+
+### 4. Data Verification
+To verify the data has reached the "Cloud," use the awslocal CLI:
+```bash
+awslocal s3 ls s3://ardit-stock-data-lake/
+```
+
+---
+
+## 📈 Roadmap
+* Phase 3 (Work in Progress): Distributed Processing with Apache Spark.
+
+* Phase 4: Workflow Orchestration with Apache Airflow.
+
+* Phase 5: Migration to AWS Production (Real S3 & Redshift).
