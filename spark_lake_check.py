@@ -9,7 +9,7 @@ os.environ["PYSPARK_SUBMIT_ARGS"] = SUBMIT_ARGS
 def create_spark_session():
     spark = (SparkSession.builder
         .appName("ArditStockAnalytics")
-        .config("spark.hadoop.fs.s3a.endpoint", "http://localhost:4566")
+        .config("spark.hadoop.fs.s3a.endpoint", "http://localstack:4566")
         .config("spark.hadoop.fs.s3a.access.key", "test")
         .config("spark.hadoop.fs.s3a.secret.key", "test")
         .config("spark.hadoop.fs.s3a.path.style.access", "true")

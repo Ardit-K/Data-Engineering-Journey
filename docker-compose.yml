@@ -1,30 +1,76 @@
 version: '3.8'
 
+# ---------------------------------------------------------
+# Airflow Base Configuration
+# ---------------------------------------------------------
+x-airflow-common:
+  &airflow-common
+  build: .
+  # image: apache/airflow:2.8.2
+  environment: &airflow-common-env
+    AIRFLOW__CORE__EXECUTOR: LocalExecutor
+    AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@airflow-db/airflow
+    AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
+  volumes:
+    - ./dags:/opt/airflow/dags
+    - ./logs:/opt/airflow/logs
+    - ./:/opt/airflow/project
+  depends_on:
+    - airflow-db
+
 services:
-  # Service 1: Your Relational Database (Phase 1)
-  db:
-    image: postgres:latest
-    container_name: my-postgres
+  # =======================================================
+  # EXISTING INFRASTRUCTURE (PHASE 1 & 2)
+  # =======================================================
+  postgres-bi:
+    image: postgres:15
     environment:
       POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: password
-      POSTGRES_DB: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: stocks
     ports:
       - "5432:5432"
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
 
-  # Service 2: Your Cloud Simulator (Phase 2)
   localstack:
-    image: localstack/localstack:latest
-    container_name: my-localstack
+    image: localstack/localstack
     ports:
-      - "4566:4566"            # The standard LocalStack gateway
+      - "4566:4566"
     environment:
-      - SERVICES=s3            # Tells LocalStack to only run S3
-      - DEBUG=1
-    volumes:
-      - "./localstack_data:/var/lib/localstack"
+      SERVICES: s3
+      DEFAULT_REGION: us-east-1
 
-volumes:
-  postgres_data:
+  # =======================================================
+  # NEW AIRFLOW ORCHESTRATION (PHASE 4)
+  # =======================================================
+  airflow-db:
+    image: postgres:13
+    environment:
+      POSTGRES_USER: airflow
+      POSTGRES_PASSWORD: airflow
+      POSTGRES_DB: airflow
+    ports:
+      - "5433:5432"
+
+  airflow-init:
+    <<: *airflow-common
+    command: version
+    environment:
+      <<: *airflow-common-env
+      _AIRFLOW_DB_UPGRADE: 'true'
+      _AIRFLOW_WWW_USER_CREATE: 'true'
+      _AIRFLOW_WWW_USER_USERNAME: admin
+      _AIRFLOW_WWW_USER_PASSWORD: admin
+
+  airflow-webserver:
+    <<: *airflow-common
+    command: webserver
+    ports:
+      - "8080:8080"
+    depends_on:
+      - airflow-init
+
+  airflow-scheduler:
+    <<: *airflow-common
+    command: scheduler
+    depends_on:
+      - airflow-init

@@ -144,12 +144,12 @@ class StockPipeline(DataConnector):
         """
         # Create the client pointing to LocalStack
         s3 = boto3.client(
-            's3',
-            endpoint_url="http://localhost:4566",
-            aws_access_key_id="test",
-            aws_secret_access_key="test",
-            region_name="us-east-1"
-        )
+        's3',
+        endpoint_url="http://localstack:4566",
+        aws_access_key_id="test",
+        aws_secret_access_key="test",
+        region_name="us-east-1"
+)
 
         try:
             # 1. Create bucket if it doesn't exist
