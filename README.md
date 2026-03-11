@@ -1,85 +1,80 @@
-# Multi-Phase Data Engineering Pipeline: Stock Market Analytics
+# 📈 End-to-End Cloud-Native Stock Market Data Pipeline
 
-This project demonstrates a professional-grade Data Engineering lifecycle, evolving from a local Python script into a **Modern Data Lakehouse** architecture. It showcases a hybrid approach to data storage, balancing relational SQL for BI and columnar object storage for Big Data analytics.
+![Python](https://img.shields.io/badge/Python-3.11-blue)
+![Apache Airflow](https://img.shields.io/badge/Apache%20Airflow-2.8-017CEE?logo=apacheairflow)
+![PySpark](https://img.shields.io/badge/PySpark-3.5.3-E25A1C?logo=apachespark)
+![AWS S3](https://img.shields.io/badge/AWS%20S3-Data%20Lake-569A31?logo=amazons3)
+![AWS Redshift](https://img.shields.io/badge/AWS%20Redshift-Serverless-8C4FFF?logo=amazonredshift)
+![Docker](https://img.shields.io/badge/Docker-Containerized-2496ED?logo=docker)
 
----
+## 📌 Project Overview
+This project is an automated, cloud-native data pipeline designed to extract, process, and warehouse daily stock market data for quantitative analysis. Built utilizing a **Medallion Architecture**, the pipeline orchestrates the ingestion of raw financial data, distributed processing using Apache Spark, and high-performance loading into an Amazon Redshift Serverless data warehouse.
 
-## 🏗 Project Architecture
+The entire workflow is fully containerized and orchestrated via **Apache Airflow**, ensuring reliable daily execution and fault tolerance.
 
-The system implements a **Dual-Ingestion Pattern**, ensuring data is stored in both a structured database and a scalable Data Lake simultaneously.
+## 🏗️ Architecture & Data Flow
 
-### Phase 1: Relational Foundation
-* **Star Schema Design:** Implemented a normalized PostgreSQL database using `dim_stocks` and `fact_prices` to optimize analytical query performance.
-* **Defensive ETL:** Built a robust ingestion framework using Python **OOP principles**, featuring automated error handling for market data volatility and data type validation.
-* **Containerization:** Orchestrated the database environment using **Docker**, ensuring high availability and local environment consistency.
+*(Note: Insert an image of your architecture diagram here. You can build a great one at draw.io or excalidraw.com!)*
 
-### Phase 2: Cloud-Native Data Lake
-* **Medallion Architecture:** Applied a tiered storage strategy (**Silver Zone**) to maintain high-quality, historical data lineage.
-* **Columnar Storage:** Optimized storage efficiency by converting raw data into **Apache Parquet** format using **PyArrow** for high-speed compression.
-* **AWS Cloud Simulation:** Integrated **LocalStack** to mock **AWS S3** services, enabling `boto3` API integration and cloud-ready testing without infrastructure overhead.
+The pipeline follows a strict extraction, transformation, and loading (ETL) sequence:
 
-### Phase 3: Distributed Analytics Engine
-* **Big Data Processing:** Implemented Apache Spark (via PySpark) to read and process historical market data directly from the S3 data lake.
+1. **Extraction:** Python scripts fetch live market data (Tickers: AAPL, MSFT, GOOGL, TSLA, NVDA) via the `yfinance` API.
+2. **Local BI Database (Bronze):** Raw data is initially persisted in a local PostgreSQL database for immediate operational querying.
+3. **Data Lake Ingestion (Silver):** Data is cleaned, partitioned, and written as Parquet files to an **AWS S3 Silver Zone**.
+4. **Distributed Processing (Spark):** A PySpark engine reads the Silver Zone data in-memory, calculates daily moving averages and aggregate volumes, and writes the transformed analytics to an **AWS S3 Gold Zone**.
+5. **Data Warehousing (Redshift):** A Python script executes an optimized Redshift `COPY` command, automatically ingesting the Gold Zone Parquet files into an **Amazon Redshift Serverless** data warehouse for downstream Business Intelligence and quantitative modeling.
 
-* **Quantitative Signal Generation:** Engineered window functions to calculate rolling 7-day moving averages and generate automated Bullish/Bearish market indicators.
+## 🛠️ Technology Stack
+* **Orchestration:** Apache Airflow (Dockerized)
+* **Data Processing Engine:** Apache Spark (PySpark 3.5.3)
+* **Data Lake:** Amazon Simple Storage Service (S3)
+* **Data Warehouse:** Amazon Redshift (Serverless)
+* **Databases:** PostgreSQL (Local BI)
+* **Languages & Libraries:** Python, Pandas, PyArrow, Boto3, psycopg2
 
-* **Medallion Completion:** Routed the highly refined, aggregated trading signals back into the Gold Zone for downstream consumption and backtesting.
+## 🚀 Prerequisites & Local Setup
 
-### Phase 4: Workflow Orchestration
-* **Automated DAGs:** Implemented **Apache Airflow** to orchestrate the entire ETL and analytical pipeline, ensuring strict task dependencies and retry logic.
-* **Isolated Execution:** Built custom Docker images containing all Python dependencies and Java runtimes, isolating the execution environment from the host machine.
-* **Idempotent Design:** Engineered the pipeline to be fully idempotent, preventing data duplication in both PostgreSQL and S3 during manual re-runs or backfilling.
+### 1. Environment Variables
+Create a `.env` file in the root directory with your local and AWS credentials:
+```text
+# Local Database
+DB_PASSWORD=your_local_pg_password
 
----
+# AWS S3 Data Lake
+AWS_ACCESS_KEY_ID=your_access_key
+AWS_SECRET_ACCESS_KEY=your_secret_key
+AWS_REGION=us-east-1
+S3_BUCKET_NAME=your-bucket-name
 
-## 🛠 Tech Stack
+# AWS Redshift Serverless
+REDSHIFT_HOST=your_namespace.redshift-serverless.amazonaws.com
+REDSHIFT_PORT=5439
+REDSHIFT_DB=dev
+REDSHIFT_USER=admin
+REDSHIFT_PASSWORD=your_redshift_password
+REDSHIFT_ROLE_ARN=arn:aws:iam::123456789:role/your_role
+```
 
-* **Languages:** Python 3.11
-* **Core Libraries:** `PySpark`, `Pandas`, `PyArrow`, `Boto3`, `yFinance`
-* **Databases:** PostgreSQL (BI & Airflow Metadata)
-* **Cloud Simulation:** LocalStack (AWS S3 Mock)
-* **Orchestration:** Apache Airflow
-* **Infrastructure:** Docker & Docker Compose
-
----
-
-## 🚀 Getting Started
-
-### 1. Infrastructure Setup
-Ensure Docker Desktop is running, then spin up the hybrid storage environment:
+### 2. Start the Infrastructure
+The entire environment, including the Airflow webserver, scheduler, and local Postgres database, is containerized.
 ```bash
-docker-compose up -d
+docker-compose up -d --build
 ```
 
-### 2. Environment Configuration
-Install the necessary Python libraries and the AWS CLI local wrapper:
-```bash
-pip install pandas pyarrow boto3 awscli-local pyspark
-```
+### 3. Execute the Pipeline
+1. Navigate to the Airflow UI at http://localhost:8080
+2. Enable the `stock_market_pipeline` DAG.
+3. Trigger the DAG manually to execute the end-to-end ingestion, Spark analytics, and Redshift warehousing tasks.
 
-### 3. Pipeline Execution
-Run the orchestrator to extract, transform, and load data into both Postgres and S3:
-``` bash
-python3 main.py
-```
-
-### 4. Distributed Processing (Phase 3)
-Execute the spark job to generate quantitative signals and populate the Gold Zone:
-```bash
-python3 spark_lake_check.py
-```
-
-### 5. Data Verification
-To verify the data has reached the "Cloud," use the awslocal CLI:
-```bash
-# Check raw ingestion (Silver)
-awslocal s3 ls s3://ardit-stock-data-lake/silver/
-
-# Check analytical output (Gold)
-awslocal s3 ls s3://ardit-stock-data-lake/gold/
-```
-
----
-
-## 📈 Roadmap
-* Phase 5 (next): Migration to AWS Production (Real S3 & Redshift).
+## 📂 Project Structure
+├── dags/
+│   └── stock_pipeline_dag.py     # Airflow DAG definition & task dependencies
+├── data/                         # Local storage volumes for Postgres/Silver zones
+├── main.py                       # Phase 1 & 2: API Extraction & S3 Silver Ingestion
+├── spark_lake_check.py           # Phase 3 & 4: PySpark Processing & S3 Gold Output
+├── redshift_setup.py             # Phase 5: Redshift Serverless COPY command
+├── pipelines.py                  # Core OOP data extraction and loading classes
+├── docker-compose.yml            # Container definitions for Airflow & Postgres
+├── Dockerfile                    # Custom Airflow image with PySpark 3.5.3
+├── requirements.txt              # Python dependencies
+└── .env                          # Secret credentials (Not tracked in Git)
