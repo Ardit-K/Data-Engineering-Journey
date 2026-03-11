@@ -76,4 +76,5 @@ docker-compose up -d --build
 ├── pipelines.py                  # Core OOP data extraction and loading classes
 ├── docker-compose.yml            # Container definitions for Airflow & Postgres
 ├── Dockerfile                    # Custom Airflow image with PySpark 3.5.3
+├── requirements.txt              # Packages for Python
 └── .env                          # Secret credentials (Not tracked in Git)
