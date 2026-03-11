@@ -67,14 +67,15 @@ docker-compose up -d --build
 3. Trigger the DAG manually to execute the end-to-end ingestion, Spark analytics, and Redshift warehousing tasks.
 
 ## 📂 Project Structure
-├── dags/
-│   └── stock_pipeline_dag.py     # Airflow DAG definition & task dependencies
-├── data/                         # Local storage volumes for Postgres/Silver zones
-├── main.py                       # Phase 1 & 2: API Extraction & S3 Silver Ingestion
-├── spark_lake_check.py           # Phase 3 & 4: PySpark Processing & S3 Gold Output
-├── redshift_setup.py             # Phase 5: Redshift Serverless COPY command
-├── pipelines.py                  # Core OOP data extraction and loading classes
-├── docker-compose.yml            # Container definitions for Airflow & Postgres
-├── Dockerfile                    # Custom Airflow image with PySpark 3.5.3
-├── requirements.txt              # Packages for Python
-└── .env                          # Secret credentials (Not tracked in Git)
+
+* 📁 **`dags/`**
+  * 🐍 `stock_pipeline_dag.py` — Airflow DAG definition & task dependencies
+* 📁 **`data/`** — Local storage volumes for Postgres and Silver zones
+* 🐍 **`main.py`** — Phase 1 & 2: API Extraction & S3 Silver Ingestion
+* 🐍 **`spark_lake_check.py`** — Phase 3 & 4: PySpark Processing & S3 Gold Output
+* 🐍 **`redshift_setup.py`** — Phase 5: Redshift Serverless COPY command
+* 🐍 **`pipelines.py`** — Core OOP data extraction and loading classes
+* 🐳 **`docker-compose.yml`** — Container definitions for Airflow & Postgres
+* 🐳 **`Dockerfile`** — Custom Airflow image with PySpark 3.5.3
+* 📄 **`requirements.txt`** — Python dependencies
+* 🔒 **`.env`** — Secret credentials (Not tracked in Git)
