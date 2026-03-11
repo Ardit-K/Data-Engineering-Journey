@@ -36,3 +36,13 @@ with DAG(
 
     # Set the strict execution dependency
     ingest_to_silver >> process_to_gold
+
+    # Create the new Redshift task
+    load_to_redshift = BashOperator(
+        task_id='load_to_redshift',
+        bash_command='python3 /opt/airflow/project/redshift_setup.py',
+    )
+
+    # Update the Dependency Chain
+    # This tells Airflow: Ingestion -> Spark -> Redshift
+    ingest_to_silver >> process_to_gold >> load_to_redshift
