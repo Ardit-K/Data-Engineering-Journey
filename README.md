@@ -18,11 +18,18 @@ The system implements a **Dual-Ingestion Pattern**, ensuring data is stored in b
 * **Columnar Storage:** Optimized storage efficiency by converting raw data into **Apache Parquet** format using **PyArrow** for high-speed compression.
 * **AWS Cloud Simulation:** Integrated **LocalStack** to mock **AWS S3** services, enabling `boto3` API integration and cloud-ready testing without infrastructure overhead.
 
+### Phase 3: Distributed Analytics Engine
+* **Big Data Processing:** Implemented Apache Spark (via PySpark) to read and process historical market data directly from the S3 data lake.
+
+* **Quantitative Signal Generation:** Engineered window functions to calculate rolling 7-day moving averages and generate automated Bullish/Bearish market indicators.
+
+* **Medallion Completion:** Routed the highly refined, aggregated trading signals back into the Gold Zone for downstream consumption and backtesting.
+
 ---
 
 ## 🛠 Tech Stack
 
-* **Languages:** Python 3.x (`Pandas`, `PyArrow`, `Boto3`, `yFinance`)
+* **Languages:** Python 3.x (`PySpark`, `Pandas`, `PyArrow`, `Boto3`, `yFinance`)
 * **Database:** PostgreSQL (via Docker)
 * **Cloud Simulation:** LocalStack (AWS S3 Mock)
 * **Infrastructure:** Docker & Docker Compose
@@ -41,7 +48,7 @@ docker-compose up -d
 ### 2. Environment Configuration
 Install the necessary Python libraries and the AWS CLI local wrapper:
 ```bash
-pip install pandas pyarrow boto3 awscli-local
+pip install pandas pyarrow boto3 awscli-local pyspark
 ```
 
 ### 3. Pipeline Execution
@@ -50,17 +57,25 @@ Run the orchestrator to extract, transform, and load data into both Postgres and
 python3 main.py
 ```
 
-### 4. Data Verification
+### 4. Distributed Processing (Phase 3)
+Execute the spark job to generate quantitative signals and populate the Gold Zone:
+```bash
+python3 spark_lake_check.py
+```
+
+### 5. Data Verification
 To verify the data has reached the "Cloud," use the awslocal CLI:
 ```bash
-awslocal s3 ls s3://ardit-stock-data-lake/
+# Check raw ingestion (Silver)
+awslocal s3 ls s3://ardit-stock-data-lake/silver/
+
+# Check analytical output (Gold)
+awslocal s3 ls s3://ardit-stock-data-lake/gold/
 ```
 
 ---
 
 ## 📈 Roadmap
-* Phase 3 (Work in Progress): Distributed Processing with Apache Spark.
-
-* Phase 4: Workflow Orchestration with Apache Airflow.
+* Phase 4 (Next): Workflow Orchestration with Apache Airflow.
 
 * Phase 5: Migration to AWS Production (Real S3 & Redshift).
