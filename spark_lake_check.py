@@ -1,65 +1,72 @@
 import os
+from dotenv import load_dotenv
 from pyspark.sql import SparkSession
-from pyspark.sql.window import Window
-import pyspark.sql.functions as F
+from pyspark.sql.functions import col, avg, round
+import logging
 
-SUBMIT_ARGS = "--packages org.apache.hadoop:hadoop-aws:3.3.4,com.amazonaws:aws-java-sdk-bundle:1.12.262 pyspark-shell"
-os.environ["PYSPARK_SUBMIT_ARGS"] = SUBMIT_ARGS
+# Load the real AWS credentials from the .env file
+load_dotenv()
 
-def create_spark_session():
-    spark = (SparkSession.builder
-        .appName("ArditStockAnalytics")
-        .config("spark.hadoop.fs.s3a.endpoint", "http://localstack:4566")
-        .config("spark.hadoop.fs.s3a.access.key", "test")
-        .config("spark.hadoop.fs.s3a.secret.key", "test")
-        .config("spark.hadoop.fs.s3a.path.style.access", "true")
-        .config("spark.hadoop.fs.s3a.impl", "org.apache.hadoop.fs.s3a.S3AFileSystem")
-        .config("spark.hadoop.fs.s3a.aws.credentials.provider", "org.apache.hadoop.fs.s3a.SimpleAWSCredentialsProvider")
-        .config("spark.hadoop.fs.s3a.connection.ssl.enabled", "false")
-        
-        # Override the timeout strings to integers for hadoop-aws:3.3.6 compatibility
-        .config("spark.hadoop.fs.s3a.connection.timeout", "60000")
-        .config("spark.hadoop.fs.s3a.connection.establish.timeout", "60000")
-        .config("spark.hadoop.fs.s3a.connection.request.timeout", "60000") 
-        
-        # The specific fix for the initThreadPools crash:
-        .config("spark.hadoop.fs.s3a.threads.keepalivetime", "60")
-        
-        .config("spark.hadoop.fs.s3a.multipart.purge.age", "86400") 
+# Set up logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
-        .config("spark.sql.parquet.enableVectorizedReader", "false")
-        .getOrCreate())
+def process_stock_data():
+    # Fetch credentials
+    aws_access_key = os.getenv("AWS_ACCESS_KEY_ID")
+    aws_secret_key = os.getenv("AWS_SECRET_ACCESS_KEY")
+    bucket_name = os.getenv("S3_BUCKET_NAME")
 
-    return spark
-
-def run_analytics_pipeline():
-    # 1. Initialize the Spark Session
-    spark = create_spark_session()
-
-    # 2. Define your S3 LocalStack paths
-    silver_path = "s3a://ardit-stock-data-lake/silver/"
-    gold_path = "s3a://ardit-stock-data-lake/gold/"
-
-    print("--- 📥 Reading from S3 Silver Zone ---")
-    # 3. Load the data ingested during Phase 1/2
-    try:
-        df = spark.read.parquet(silver_path)
-    except Exception as e:
-        print(f"Error reading from Silver Zone. Make sure Phase 2 has populated {silver_path}")
-        print(f"Exception: {e}")
+    if not all([aws_access_key, aws_secret_key, bucket_name]):
+        logging.error("Missing AWS credentials or bucket name in .env file.")
         return
 
-    # Transformation Logic
-    window_spec = Window.partitionBy("ticker").orderBy("date").rowsBetween(-6, 0)
-    df_gold = df.withColumn("7_day_moving_avg", F.round(F.avg("close").over(window_spec), 2))
-    df_gold = df_gold.withColumn("signal", F.when(F.col("close") > F.col("7_day_moving_avg"), "BULLISH").otherwise("BEARISH"))
+    logging.info("Initializing Spark Session for REAL AWS S3...")
 
-    print("--- 💾 Saving to S3 Gold Zone ---")
-    # Save the aggregated data back to the simulated cloud
-    df_gold.write.mode("overwrite").parquet(gold_path)
+    # Initialize Spark Session
+    # Notice we completely removed the spark.hadoop.fs.s3a.endpoint line!
+    spark = SparkSession.builder \
+        .appName("StockMarketAnalytics_Production") \
+        .config("spark.jars.packages", "org.apache.hadoop:hadoop-aws:3.3.4,com.amazonaws:aws-java-sdk-bundle:1.12.262") \
+        .config("spark.hadoop.fs.s3a.access.key", aws_access_key) \
+        .config("spark.hadoop.fs.s3a.secret.key", aws_secret_key) \
+        .config("spark.hadoop.fs.s3a.impl", "org.apache.hadoop.fs.s3a.S3AFileSystem") \
+        .config("spark.hadoop.fs.s3a.aws.credentials.provider", "org.apache.hadoop.fs.s3a.SimpleAWSCredentialsProvider") \
+        .getOrCreate()
 
-    print("--- ✅ SUCCESS ---")
-    df_gold.select("ticker", "date", "close", "7_day_moving_avg", "signal").orderBy(F.desc("date")).show(10)
+    # Reduce console spam
+    spark.sparkContext.setLogLevel("WARN")
+
+    # Define the dynamic paths using s3a:// protocol
+    silver_path = f"s3a://{bucket_name}/silver/*.parquet"
+    gold_path = f"s3a://{bucket_name}/gold/daily_moving_averages"
+
+    try:
+        # 1. Read from the Silver Zone (AWS)
+        logging.info(f"Reading Silver data from {silver_path}")
+        df = spark.read.parquet(silver_path)
+
+        # 2. Transform: Calculate Moving Averages
+        logging.info("Calculating Average Close Price and Total Volume...")
+        analytics_df = df.groupBy("ticker") \
+            .agg(
+                round(avg("close"), 2).alias("avg_close"),
+                round(avg("volume"), 0).alias("avg_volume")
+            )
+
+        analytics_df.show()
+
+        # 3. Write to the Gold Zone (AWS)
+        logging.info(f"Writing Gold data to {gold_path}")
+        analytics_df.write \
+            .mode("overwrite") \
+            .parquet(gold_path)
+
+        logging.info("Spark Analytics Pipeline Completed Successfully!")
+
+    except Exception as e:
+        logging.error(f"Spark Job Failed: {e}")
+    finally:
+        spark.stop()
 
 if __name__ == "__main__":
-    run_analytics_pipeline()
+    process_stock_data()

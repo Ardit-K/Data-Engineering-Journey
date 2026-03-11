@@ -17,11 +17,12 @@ ENV JAVA_HOME=/usr/lib/jvm/java-17-openjdk-arm64
 # Switch back to the safe airflow user
 USER airflow
 
-# Install all the Python libraries your specific pipeline needs
+# Install all the Python libraries
 RUN pip install --no-cache-dir \
     yfinance \
     pandas \
     pyarrow \
     boto3 \
-    pyspark \
-    psycopg2-binary
+    pyspark==3.5.3 \
+    psycopg2-binary \
+    python-dotenv
