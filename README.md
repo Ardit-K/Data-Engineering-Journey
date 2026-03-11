@@ -25,15 +25,21 @@ The system implements a **Dual-Ingestion Pattern**, ensuring data is stored in b
 
 * **Medallion Completion:** Routed the highly refined, aggregated trading signals back into the Gold Zone for downstream consumption and backtesting.
 
+### Phase 4: Workflow Orchestration
+* **Automated DAGs:** Implemented **Apache Airflow** to orchestrate the entire ETL and analytical pipeline, ensuring strict task dependencies and retry logic.
+* **Isolated Execution:** Built custom Docker images containing all Python dependencies and Java runtimes, isolating the execution environment from the host machine.
+* **Idempotent Design:** Engineered the pipeline to be fully idempotent, preventing data duplication in both PostgreSQL and S3 during manual re-runs or backfilling.
+
 ---
 
 ## 🛠 Tech Stack
 
-* **Languages:** Python 3.x (`PySpark`, `Pandas`, `PyArrow`, `Boto3`, `yFinance`)
-* **Database:** PostgreSQL (via Docker)
+* **Languages:** Python 3.11
+* **Core Libraries:** `PySpark`, `Pandas`, `PyArrow`, `Boto3`, `yFinance`
+* **Databases:** PostgreSQL (BI & Airflow Metadata)
 * **Cloud Simulation:** LocalStack (AWS S3 Mock)
+* **Orchestration:** Apache Airflow
 * **Infrastructure:** Docker & Docker Compose
-* **Automation:** Linux/macOS Crontab
 
 ---
 
@@ -76,6 +82,4 @@ awslocal s3 ls s3://ardit-stock-data-lake/gold/
 ---
 
 ## 📈 Roadmap
-* Phase 4 (Next): Workflow Orchestration with Apache Airflow.
-
-* Phase 5: Migration to AWS Production (Real S3 & Redshift).
+* Phase 5 (next): Migration to AWS Production (Real S3 & Redshift).
