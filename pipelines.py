@@ -138,9 +138,9 @@ class StockPipeline(DataConnector):
         logging.info(f"Phase 2: Data successfully loaded to Lake at {full_path}")
         return full_path  # Return the path for potential upload to S3
 
-    def upload_to_s3(self, local_path: str, bucket_name: str):
+    def upload_to_s3(self, local_path: str, bucket_name: str, zone: str = "silver"):
         """
-        Uploads your Parquet file to the LocalStack S3 bucket.
+        Uploads your Parquet file to the LocalStack S3 bucket within the correct zone.
         """
         # Create the client pointing to LocalStack
         s3 = boto3.client(
@@ -153,15 +153,15 @@ class StockPipeline(DataConnector):
 
         try:
             # 1. Create bucket if it doesn't exist
-            # Note: In LocalStack, buckets are deleted when you stop the container
             s3.create_bucket(Bucket=bucket_name)
             
-            # 2. Extract filename from path (e.g., 'stocks_2026_03_08.parquet')
-            s3_file_name = os.path.basename(local_path)
+            # 2. Extract filename and prepend the zone prefix
+            file_name = os.path.basename(local_path)
+            s3_key = f"{zone}/{file_name}"  # This creates the virtual 'folder' in S3
             
-            # 3. Upload
-            s3.upload_file(local_path, bucket_name, s3_file_name)
-            logging.info(f"Successfully uploaded {s3_file_name} to local S3.")
+            # 3. Upload using the full prefixed key
+            s3.upload_file(local_path, bucket_name, s3_key)
+            logging.info(f"Successfully uploaded to local S3 at s3://{bucket_name}/{s3_key}")
             
         except Exception as e:
             logging.error(f"S3 Upload failed: {e}")
