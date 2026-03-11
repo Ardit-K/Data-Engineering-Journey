@@ -9,14 +9,14 @@ password = os.getenv("DB_PASSWORD")
 
 # 1. Configuration (In production, these would be in environment variables)
 DB_CONFIG = {
-    "host": "postgres-bi",
+    "host": "localhost",
     "port": "5432",
     "database": "stocks",
     "user": "postgres",
     "password": "postgres"
 }
 
-S3_BUCKET = "ardit-stock-data-lake"
+S3_BUCKET = os.getenv("S3_BUCKET_NAME")
 TICKERS_TO_TRACK = ["AAPL", "MSFT", "GOOGL", "TSLA", "NVDA"]
 
 # 2. Setup Logging

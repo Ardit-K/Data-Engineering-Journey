@@ -9,8 +9,11 @@ import pyarrow.parquet as pq
 from datetime import datetime
 import os
 import boto3
-import os
+from dotenv import load_dotenv
 from connector import DataConnector  # Import your base class
+
+# Load environment variables from the .env file
+load_dotenv()
 
 class StockPipeline(DataConnector):
     """
@@ -115,7 +118,6 @@ class StockPipeline(DataConnector):
         df['volume'] = df['volume'].astype(int)
         
         # 3. Save to Parquet format
-        # This creates a file that is highly compressed and optimized for speed
         df.to_parquet(filename, engine='pyarrow', compression='snappy')
         
         print(f"Successfully saved {len(df)} rows to {filename}")
@@ -140,28 +142,43 @@ class StockPipeline(DataConnector):
 
     def upload_to_s3(self, local_path: str, bucket_name: str, zone: str = "silver"):
         """
-        Uploads your Parquet file to the LocalStack S3 bucket within the correct zone.
+        Uploads your Parquet file to the REAL AWS S3 bucket within the correct zone.
         """
-        # Create the client pointing to LocalStack
+        # Dynamically pull credentials from the .env file
+        aws_access_key = os.getenv("AWS_ACCESS_KEY_ID")
+        aws_secret_key = os.getenv("AWS_SECRET_ACCESS_KEY")
+        region = os.getenv("AWS_REGION", "us-east-1")
+
+        # Create the client pointing to real AWS infrastructure
         s3 = boto3.client(
-        's3',
-        endpoint_url="http://localstack:4566",
-        aws_access_key_id="test",
-        aws_secret_access_key="test",
-        region_name="us-east-1"
-)
+            's3',
+            aws_access_key_id=aws_access_key,
+            aws_secret_access_key=aws_secret_key,
+            region_name=region
+        )
 
         try:
             # 1. Create bucket if it doesn't exist
-            s3.create_bucket(Bucket=bucket_name)
+            # Note: AWS bucket creation requires specific LocationConstraint configurations 
+            # if the region is not us-east-1, but boto3 handles basic creation well here.
+            try:
+                s3.head_bucket(Bucket=bucket_name)
+            except Exception:
+                if region == "us-east-1":
+                    s3.create_bucket(Bucket=bucket_name)
+                else:
+                    s3.create_bucket(
+                        Bucket=bucket_name,
+                        CreateBucketConfiguration={'LocationConstraint': region}
+                    )
             
             # 2. Extract filename and prepend the zone prefix
             file_name = os.path.basename(local_path)
-            s3_key = f"{zone}/{file_name}"  # This creates the virtual 'folder' in S3
+            s3_key = f"{zone}/{file_name}" 
             
             # 3. Upload using the full prefixed key
             s3.upload_file(local_path, bucket_name, s3_key)
-            logging.info(f"Successfully uploaded to local S3 at s3://{bucket_name}/{s3_key}")
+            logging.info(f"Successfully uploaded to REAL AWS S3 at s3://{bucket_name}/{s3_key}")
             
         except Exception as e:
-            logging.error(f"S3 Upload failed: {e}")
+            logging.error(f"AWS S3 Upload failed: {e}")
